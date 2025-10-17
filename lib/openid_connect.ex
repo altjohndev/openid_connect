@@ -2,8 +2,8 @@ defmodule OpenIDConnect do
   @moduledoc """
   OpenID Connect client library for Elixir.
 
-  This library provides a complete implementation of the [OpenID Connect](https://openid.net/connect/)
-  authentication protocol, which is built on top of OAuth 2.0. It handles the complete authentication
+  This library provides a complete implementation of the [OpenID Connect](https://openid.net/connect/) 
+  authentication protocol, which is built on top of OAuth 2.0. It handles the complete authentication 
   flow including:
 
   * Generating authorization URIs for redirecting users to identity providers
@@ -442,7 +442,7 @@ defmodule OpenIDConnect do
     google_config,
     %{
       code: params["code"],
-      redirect_uri: "https://example.com/auth/callback"
+      redirect_uri: "https://example.com/auth/callback" 
     }
   )
 

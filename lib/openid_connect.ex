@@ -113,19 +113,12 @@ defmodule OpenIDConnect do
   @type scope :: [String.t()] | String.t()
 
   @typedoc """
-  `OpenIDConnect.verify/3` operations to ignore.
-
-  - `:audience_matching` - Ignores the "aud" (audience) claim verification that ensures the token
-    is intended for your application.
-  """
-  @type verify_operations_to_ignore :: :audience_matching
-
-  @typedoc """
   Options for `OpenIDConnect.verify/3`:
 
-  - `:ignore` - An atom or a list of atoms with operations to ignore.
+  - `:ignore_claims` - A list of claims to not be verified.
+    Available claim options to use: `"aud"`.
   """
-  @type verify_opts :: [ignore: verify_operations_to_ignore() | [verify_operations_to_ignore()]]
+  @type verify_opts :: [ignore_claims: [String.t()]]
 
   @typedoc """
   The configuration of a OpenID provider.
@@ -505,10 +498,8 @@ defmodule OpenIDConnect do
 
   ## Options
 
-  - `:ignore` - An atom or a list of atoms with operations to ignore. Defaults to an empty list.
-    Operations that can be ignored:
-    - `:audience_matching` - Ignores the "aud" (audience) claim verification that ensures the
-      token is intended for your application.
+  - `:ignore_claims` - A list of claims to not be verified.
+    Available claim options to use: `"aud"`.
 
   ## Returns
 
@@ -535,6 +526,16 @@ defmodule OpenIDConnect do
   name = claims["name"]           # User's name (if in scope)
   picture = claims["picture"]     # URL to user's profile picture (if available)
   issuer = claims["iss"]          # Identifies the token issuer
+  ```
+
+  Ignoring "aud" claim verification:
+
+  ```elixir
+  google_config = %{client_id: "aaccaecd-fd29-46e7-be3e-58a99f355157", ...}
+
+  {:ok, claims} = OpenIDConnect.verify(google_config, id_token, ignore_claims: ["aud"])
+
+  audience = claims["aud"]        # b52bc817-2ab3-4aba-bd6e-286713d542f0
   ```
 
   ## Security Warning
@@ -630,7 +631,7 @@ defmodule OpenIDConnect do
   defp verify_aud_claim(claims, expected_aud, opts) do
     case Map.fetch(claims, "aud") do
       {:ok, aud} ->
-        if ignore_audience_matching?(opts) or audience_matches?(aud, expected_aud),
+        if ignore_claim?(opts, "aud") or audience_matches?(aud, expected_aud),
           do: :ok,
           else: {:error, "aud", "token is intended for another application"}
 
@@ -639,7 +640,7 @@ defmodule OpenIDConnect do
     end
   end
 
-  defp ignore_audience_matching?(opts), do: :audience_matching in List.wrap(opts[:ignore])
+  defp ignore_claim?(opts, claim), do: claim in List.wrap(opts[:ignore_claims])
 
   defp audience_matches?(aud, expected_aud) when is_list(aud), do: Enum.member?(aud, expected_aud)
   defp audience_matches?(aud, expected_aud), do: aud === expected_aud

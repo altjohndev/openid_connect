@@ -557,6 +557,33 @@ defmodule OpenIDConnectTest do
       assert verify(config, token) == {:error, {:invalid_jwt, "invalid aud claim: missing"}}
     end
 
+    test """
+    returns claims when \
+    encoded token is valid, \
+    aud is for another application, \
+    and ignore_audience_matching? is true\
+    """ do
+      {jwks, []} = Code.eval_file("test/fixtures/jwks/jwk.exs")
+      jwk = JOSE.JWK.from(jwks)
+      {_, jwk_pubkey} = JOSE.JWK.to_public_map(jwk)
+
+      {_bypass, uri} = start_fixture("vault", %{"jwks" => jwk_pubkey})
+      config = %{@config | discovery_document_uri: uri}
+
+      claims = %{
+        "email" => "brian@example.com",
+        "exp" => DateTime.utc_now() |> DateTime.add(10, :second) |> DateTime.to_unix(),
+        "aud" => "foo"
+      }
+
+      {_alg, token} =
+        jwk
+        |> JOSE.JWS.sign(Jason.encode!(claims), %{"alg" => "RS256"})
+        |> JOSE.JWS.compact()
+
+      assert verify(config, token, ignore_audience_matching?: true) == {:ok, claims}
+    end
+
     test "returns error when token is altered" do
       {jwks, []} = Code.eval_file("test/fixtures/jwks/jwk.exs")
       jwk = JOSE.JWK.from(jwks)

@@ -2,8 +2,8 @@ defmodule OpenIDConnect do
   @moduledoc """
   OpenID Connect client library for Elixir.
 
-  This library provides a complete implementation of the [OpenID Connect](https://openid.net/connect/) 
-  authentication protocol, which is built on top of OAuth 2.0. It handles the complete authentication 
+  This library provides a complete implementation of the [OpenID Connect](https://openid.net/connect/)
+  authentication protocol, which is built on top of OAuth 2.0. It handles the complete authentication
   flow including:
 
   * Generating authorization URIs for redirecting users to identity providers
@@ -111,6 +111,14 @@ defmodule OpenIDConnect do
   OAuth 2.0 Scope Values that the Client is declaring that it will restrict itself to using.
   """
   @type scope :: [String.t()] | String.t()
+
+  @typedoc """
+  Options for `OpenIDConnect.verify/3`:
+
+  - `:ignore_audience_matching?` - If set to `true`, the `"aud"` claim value will not be
+    validated. Defaults to `false`.
+  """
+  @type verify_opts :: [ignore_audience_matching?: boolean()]
 
   @typedoc """
   The configuration of a OpenID provider.
@@ -434,7 +442,7 @@ defmodule OpenIDConnect do
     google_config,
     %{
       code: params["code"],
-      redirect_uri: "https://example.com/auth/callback" 
+      redirect_uri: "https://example.com/auth/callback"
     }
   )
 
@@ -481,12 +489,18 @@ defmodule OpenIDConnect do
 
   1. The token's signature is valid and was signed by the provider's key
   2. The token has not expired (checking the "exp" claim)
-  3. The token is intended for your application (checking the "aud" claim)
+  3. The token is intended for your application (checking the "aud" claim). This validation can
+     be skipped by using the `ignore_audience_matching?: true` option.
 
   ## Parameters
 
   * `config` - The provider configuration map
   * `jwt` - The ID token string (a JSON Web Token) from the tokens response
+
+  ## Options
+
+  - `:ignore_audience_matching?` - If set to `true`, the `"aud"` claim value will not be
+    validated. Defaults to `false`.
 
   ## Returns
 
@@ -500,7 +514,8 @@ defmodule OpenIDConnect do
   2. The "exp" (expiration) claim is checked to ensure the token has not expired.
      A configurable leeway (default: 30 seconds) is allowed to account for clock skew.
   3. The "aud" (audience) claim is verified to ensure the token is intended for your
-     application, as identified by your client_id.
+     application, as identified by your client_id. This validation can be skipped by using the
+     `ignore_audience_matching?: true` option.
 
   ## Example
 
@@ -520,9 +535,9 @@ defmodule OpenIDConnect do
   Always verify tokens before trusting their contents. Never use token data for
   authentication purposes without verification, as tokens could be forged or tampered with.
   """
-  @spec verify(config(), jwt :: String.t()) ::
+  @spec verify(config(), jwt :: String.t(), verify_opts()) ::
           {:ok, claims :: map()} | {:error, term()}
-  def verify(config, jwt) do
+  def verify(config, jwt, opts \\ []) do
     discovery_document_uri = config.discovery_document_uri
 
     with {:ok, protected} <- peek_protected(jwt),
@@ -531,7 +546,7 @@ defmodule OpenIDConnect do
          {:ok, document} <- Document.fetch_document(discovery_document_uri),
          {true, claims, _jwk} <- verify_signature(document.jwks, token_alg, jwt),
          {:ok, unverified_claims} <- Jason.decode(claims),
-         {:ok, verified_claims} <- verify_claims(unverified_claims, config) do
+         {:ok, verified_claims} <- verify_claims(unverified_claims, config, opts) do
       {:ok, verified_claims}
     else
       {:error, %Jason.DecodeError{}} ->
@@ -578,12 +593,12 @@ defmodule OpenIDConnect do
   defp verify_signature(%JOSE.JWK{} = jwk, token_alg, jwt),
     do: JOSE.JWS.verify_strict(jwk, [token_alg], jwt)
 
-  defp verify_claims(claims, config) do
+  defp verify_claims(claims, config, opts) do
     leeway = Map.get(config, :leeway, 30)
     client_id = Map.fetch!(config, :client_id)
 
     with :ok <- verify_exp_claim(claims, leeway),
-         :ok <- verify_aud_claim(claims, client_id) do
+         :ok <- verify_aud_claim(claims, client_id, opts) do
       {:ok, claims}
     end
   end
@@ -605,10 +620,10 @@ defmodule OpenIDConnect do
     end
   end
 
-  defp verify_aud_claim(claims, expected_aud) do
+  defp verify_aud_claim(claims, expected_aud, opts) do
     case Map.fetch(claims, "aud") do
       {:ok, aud} ->
-        if audience_matches?(aud, expected_aud),
+        if opts[:ignore_audience_matching?] == true or audience_matches?(aud, expected_aud),
           do: :ok,
           else: {:error, "aud", "token is intended for another application"}
 

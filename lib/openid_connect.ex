@@ -113,12 +113,19 @@ defmodule OpenIDConnect do
   @type scope :: [String.t()] | String.t()
 
   @typedoc """
+  `OpenIDConnect.verify/3` operations to ignore.
+
+  - `:audience_matching` - Ignores the "aud" (audience) claim verification that ensures the token
+    is intended for your application.
+  """
+  @type verify_operations_to_ignore :: :audience_matching
+
+  @typedoc """
   Options for `OpenIDConnect.verify/3`:
 
-  - `:ignore_audience_matching?` - If set to `true`, the `"aud"` claim value will not be
-    validated. Defaults to `false`.
+  - `:ignore` - An atom or a list of atoms with operations to ignore.
   """
-  @type verify_opts :: [ignore_audience_matching?: boolean()]
+  @type verify_opts :: [ignore: verify_operations_to_ignore() | [verify_operations_to_ignore()]]
 
   @typedoc """
   The configuration of a OpenID provider.
@@ -489,8 +496,7 @@ defmodule OpenIDConnect do
 
   1. The token's signature is valid and was signed by the provider's key
   2. The token has not expired (checking the "exp" claim)
-  3. The token is intended for your application (checking the "aud" claim). This validation can
-     be skipped by using the `ignore_audience_matching?: true` option.
+  3. The token is intended for your application (checking the "aud" claim)
 
   ## Parameters
 
@@ -499,8 +505,10 @@ defmodule OpenIDConnect do
 
   ## Options
 
-  - `:ignore_audience_matching?` - If set to `true`, the `"aud"` claim value will not be
-    validated. Defaults to `false`.
+  - `:ignore` - An atom or a list of atoms with operations to ignore. Defaults to an empty list.
+    Operations that can be ignored:
+    - `:audience_matching` - Ignores the "aud" (audience) claim verification that ensures the
+      token is intended for your application.
 
   ## Returns
 
@@ -514,8 +522,7 @@ defmodule OpenIDConnect do
   2. The "exp" (expiration) claim is checked to ensure the token has not expired.
      A configurable leeway (default: 30 seconds) is allowed to account for clock skew.
   3. The "aud" (audience) claim is verified to ensure the token is intended for your
-     application, as identified by your client_id. This validation can be skipped by using the
-     `ignore_audience_matching?: true` option.
+     application, as identified by your client_id.
 
   ## Example
 
@@ -623,7 +630,7 @@ defmodule OpenIDConnect do
   defp verify_aud_claim(claims, expected_aud, opts) do
     case Map.fetch(claims, "aud") do
       {:ok, aud} ->
-        if opts[:ignore_audience_matching?] == true or audience_matches?(aud, expected_aud),
+        if ignore_audience_matching?(opts) or audience_matches?(aud, expected_aud),
           do: :ok,
           else: {:error, "aud", "token is intended for another application"}
 
@@ -631,6 +638,8 @@ defmodule OpenIDConnect do
         {:error, "aud", "missing"}
     end
   end
+
+  defp ignore_audience_matching?(opts), do: :audience_matching in List.wrap(opts[:ignore])
 
   defp audience_matches?(aud, expected_aud) when is_list(aud), do: Enum.member?(aud, expected_aud)
   defp audience_matches?(aud, expected_aud), do: aud === expected_aud

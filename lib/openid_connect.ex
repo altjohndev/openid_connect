@@ -546,6 +546,8 @@ defmodule OpenIDConnect do
   @spec verify(config(), jwt :: String.t(), verify_opts()) ::
           {:ok, claims :: map()} | {:error, term()}
   def verify(config, jwt, opts \\ []) do
+    opts = Keyword.validate!(opts, ignore_claims: [])
+
     discovery_document_uri = config.discovery_document_uri
 
     with {:ok, protected} <- peek_protected(jwt),
@@ -605,11 +607,21 @@ defmodule OpenIDConnect do
     leeway = Map.get(config, :leeway, 30)
     client_id = Map.fetch!(config, :client_id)
 
-    with :ok <- verify_exp_claim(claims, leeway),
-         :ok <- verify_aud_claim(claims, client_id, opts) do
+    with :ok <- maybe_verify_exp_claim(claims, leeway, opts),
+         :ok <- maybe_verify_aud_claim(claims, client_id, opts) do
       {:ok, claims}
     end
   end
+
+  defp maybe_verify_exp_claim(claims, leeway, opts) do
+    if ignore_claim?(opts, "exp") do
+      :ok
+    else
+      verify_exp_claim(claims, leeway)
+    end
+  end
+ 
+  defp ignore_claim?(opts, claim), do: claim in List.wrap(opts[:ignore_claims])
 
   defp verify_exp_claim(claims, leeway) do
     case Map.fetch(claims, "exp") do
@@ -627,11 +639,19 @@ defmodule OpenIDConnect do
         {:error, "exp", "missing"}
     end
   end
+  
+  defp maybe_verify_aud_claim(claims, expected_aud, opts) do
+    if ignore_claim?(opts, "aud") do
+      :ok
+    else
+      verify_aud_claim(claims, expected_aud)
+    end
+  end
 
-  defp verify_aud_claim(claims, expected_aud, opts) do
+  defp verify_aud_claim(claims, expected_aud) do
     case Map.fetch(claims, "aud") do
       {:ok, aud} ->
-        if ignore_claim?(opts, "aud") or audience_matches?(aud, expected_aud),
+        if audience_matches?(aud, expected_aud),
           do: :ok,
           else: {:error, "aud", "token is intended for another application"}
 
@@ -639,9 +659,7 @@ defmodule OpenIDConnect do
         {:error, "aud", "missing"}
     end
   end
-
-  defp ignore_claim?(opts, claim), do: claim in List.wrap(opts[:ignore_claims])
-
+  
   defp audience_matches?(aud, expected_aud) when is_list(aud), do: Enum.member?(aud, expected_aud)
   defp audience_matches?(aud, expected_aud), do: aud === expected_aud
 

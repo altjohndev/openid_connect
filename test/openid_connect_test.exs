@@ -512,12 +512,7 @@ defmodule OpenIDConnectTest do
       assert verify(config, token) == {:error, {:invalid_jwt, "invalid exp claim: missing"}}
     end
 
-    test """
-    returns claims when \
-    encoded token is valid, \
-    encoded token is expired, \
-    and [ignore_claims: ["exp"]] option is set\
-    """ do
+    test "returns claims when encoded token is expired and exp ignore claim option is set" do
       {jwks, []} = Code.eval_file("test/fixtures/jwks/jwk.exs")
       jwk = JOSE.JWK.from(jwks)
       {_, jwk_pubkey} = JOSE.JWK.to_public_map(jwk)
@@ -539,12 +534,7 @@ defmodule OpenIDConnectTest do
       assert verify(config, token, ignore_claims: ["exp"]) == {:ok, claims}
     end
 
-    test """
-    returns claims when \
-    encoded token is valid, \
-    encoded token expiration is not set, \
-    and [ignore_claims: ["exp"]] option is set\
-    """ do
+    test "returns claims when exp claim is not set and exp ignore claim option is set" do
       {jwks, []} = Code.eval_file("test/fixtures/jwks/jwk.exs")
       jwk = JOSE.JWK.from(jwks)
       {_, jwk_pubkey} = JOSE.JWK.to_public_map(jwk)
@@ -610,12 +600,7 @@ defmodule OpenIDConnectTest do
       assert verify(config, token) == {:error, {:invalid_jwt, "invalid aud claim: missing"}}
     end
 
-    test """
-    returns claims when \
-    encoded token is valid, \
-    aud is for another application, \
-    and [ignore_claims: ["aud"]] option is set\
-    """ do
+    test "returns claims when aud is for another application and aud ignore claim option is set" do
       {jwks, []} = Code.eval_file("test/fixtures/jwks/jwk.exs")
       jwk = JOSE.JWK.from(jwks)
       {_, jwk_pubkey} = JOSE.JWK.to_public_map(jwk)
@@ -637,12 +622,7 @@ defmodule OpenIDConnectTest do
       assert verify(config, token, ignore_claims: ["aud"]) == {:ok, claims}
     end
 
-    test """
-    returns claims when \
-    encoded token is valid, \
-    claim is not set, \
-    and [ignore_claims: ["aud"]] option is set\
-    """ do
+    test "returns claims when aud claim is not set and aud ignore claim option is set" do
       {jwks, []} = Code.eval_file("test/fixtures/jwks/jwk.exs")
       jwk = JOSE.JWK.from(jwks)
       {_, jwk_pubkey} = JOSE.JWK.to_public_map(jwk)

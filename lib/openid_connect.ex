@@ -659,7 +659,7 @@ defmodule OpenIDConnect do
         {:error, "aud", "missing"}
     end
   end
-  
+
   defp audience_matches?(aud, expected_aud) when is_list(aud), do: Enum.member?(aud, expected_aud)
   defp audience_matches?(aud, expected_aud), do: aud === expected_aud
 

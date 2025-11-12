@@ -620,7 +620,7 @@ defmodule OpenIDConnect do
       verify_exp_claim(claims, leeway)
     end
   end
- 
+
   defp ignore_claim?(opts, claim), do: claim in List.wrap(opts[:ignore_claims])
 
   defp verify_exp_claim(claims, leeway) do
@@ -639,7 +639,7 @@ defmodule OpenIDConnect do
         {:error, "exp", "missing"}
     end
   end
-  
+
   defp maybe_verify_aud_claim(claims, expected_aud, opts) do
     if ignore_claim?(opts, "aud") do
       :ok

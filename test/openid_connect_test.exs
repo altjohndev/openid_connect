@@ -512,6 +512,49 @@ defmodule OpenIDConnectTest do
       assert verify(config, token) == {:error, {:invalid_jwt, "invalid exp claim: missing"}}
     end
 
+    test "returns claims when encoded token is expired and exp ignore claim option is set" do
+      {jwks, []} = Code.eval_file("test/fixtures/jwks/jwk.exs")
+      jwk = JOSE.JWK.from(jwks)
+      {_, jwk_pubkey} = JOSE.JWK.to_public_map(jwk)
+
+      {_bypass, uri} = start_fixture("vault", %{"jwks" => jwk_pubkey})
+      config = %{@config | discovery_document_uri: uri}
+
+      claims = %{
+        "email" => "brian@example.com",
+        "exp" => DateTime.utc_now() |> DateTime.add(-31, :second) |> DateTime.to_unix(),
+        "aud" => config.client_id
+      }
+
+      {_alg, token} =
+        jwk
+        |> JOSE.JWS.sign(Jason.encode!(claims), %{"alg" => "RS256"})
+        |> JOSE.JWS.compact()
+
+      assert verify(config, token, ignore_claims: ["exp"]) == {:ok, claims}
+    end
+
+    test "returns claims when exp claim is not set and exp ignore claim option is set" do
+      {jwks, []} = Code.eval_file("test/fixtures/jwks/jwk.exs")
+      jwk = JOSE.JWK.from(jwks)
+      {_, jwk_pubkey} = JOSE.JWK.to_public_map(jwk)
+
+      {_bypass, uri} = start_fixture("vault", %{"jwks" => jwk_pubkey})
+      config = %{@config | discovery_document_uri: uri}
+
+      claims = %{
+        "email" => "brian@example.com",
+        "aud" => config.client_id
+      }
+
+      {_alg, token} =
+        jwk
+        |> JOSE.JWS.sign(Jason.encode!(claims), %{"alg" => "RS256"})
+        |> JOSE.JWS.compact()
+
+      assert verify(config, token, ignore_claims: ["exp"]) == {:ok, claims}
+    end
+
     test "returns error when aud claim is for another application" do
       {jwks, []} = Code.eval_file("test/fixtures/jwks/jwk.exs")
       jwk = JOSE.JWK.from(jwks)
@@ -555,6 +598,49 @@ defmodule OpenIDConnectTest do
         |> JOSE.JWS.compact()
 
       assert verify(config, token) == {:error, {:invalid_jwt, "invalid aud claim: missing"}}
+    end
+
+    test "returns claims when aud is for another application and aud ignore claim option is set" do
+      {jwks, []} = Code.eval_file("test/fixtures/jwks/jwk.exs")
+      jwk = JOSE.JWK.from(jwks)
+      {_, jwk_pubkey} = JOSE.JWK.to_public_map(jwk)
+
+      {_bypass, uri} = start_fixture("vault", %{"jwks" => jwk_pubkey})
+      config = %{@config | discovery_document_uri: uri}
+
+      claims = %{
+        "email" => "brian@example.com",
+        "exp" => DateTime.utc_now() |> DateTime.add(10, :second) |> DateTime.to_unix(),
+        "aud" => "foo"
+      }
+
+      {_alg, token} =
+        jwk
+        |> JOSE.JWS.sign(Jason.encode!(claims), %{"alg" => "RS256"})
+        |> JOSE.JWS.compact()
+
+      assert verify(config, token, ignore_claims: ["aud"]) == {:ok, claims}
+    end
+
+    test "returns claims when aud claim is not set and aud ignore claim option is set" do
+      {jwks, []} = Code.eval_file("test/fixtures/jwks/jwk.exs")
+      jwk = JOSE.JWK.from(jwks)
+      {_, jwk_pubkey} = JOSE.JWK.to_public_map(jwk)
+
+      {_bypass, uri} = start_fixture("vault", %{"jwks" => jwk_pubkey})
+      config = %{@config | discovery_document_uri: uri}
+
+      claims = %{
+        "email" => "brian@example.com",
+        "exp" => DateTime.utc_now() |> DateTime.to_unix()
+      }
+
+      {_alg, token} =
+        jwk
+        |> JOSE.JWS.sign(Jason.encode!(claims), %{"alg" => "RS256"})
+        |> JOSE.JWS.compact()
+
+      assert verify(config, token, ignore_claims: ["aud"]) == {:ok, claims}
     end
 
     test "returns error when token is altered" do

@@ -113,6 +113,14 @@ defmodule OpenIDConnect do
   @type scope :: [String.t()] | String.t()
 
   @typedoc """
+  Options for `OpenIDConnect.verify/3`:
+
+  - `:ignore_claims` - A list of claims to not be verified.
+    Available claim options to use: `"aud"`.
+  """
+  @type verify_opts :: [ignore_claims: [String.t()]]
+
+  @typedoc """
   The configuration of a OpenID provider.
   """
   @type config :: %{
@@ -488,6 +496,11 @@ defmodule OpenIDConnect do
   * `config` - The provider configuration map
   * `jwt` - The ID token string (a JSON Web Token) from the tokens response
 
+  ## Options
+
+  - `:ignore_claims` - A list of claims to not be verified.
+    Available claim options to use: `"aud"`.
+
   ## Returns
 
   * `{:ok, claims}` - On successful verification, returns the decoded claims from the token
@@ -515,14 +528,26 @@ defmodule OpenIDConnect do
   issuer = claims["iss"]          # Identifies the token issuer
   ```
 
+  Ignoring "aud" claim verification:
+
+  ```elixir
+  google_config = %{client_id: "aaccaecd-fd29-46e7-be3e-58a99f355157", ...}
+
+  {:ok, claims} = OpenIDConnect.verify(google_config, id_token, ignore_claims: ["aud"])
+
+  audience = claims["aud"]        # b52bc817-2ab3-4aba-bd6e-286713d542f0
+  ```
+
   ## Security Warning
 
   Always verify tokens before trusting their contents. Never use token data for
   authentication purposes without verification, as tokens could be forged or tampered with.
   """
-  @spec verify(config(), jwt :: String.t()) ::
+  @spec verify(config(), jwt :: String.t(), verify_opts()) ::
           {:ok, claims :: map()} | {:error, term()}
-  def verify(config, jwt) do
+  def verify(config, jwt, opts \\ []) do
+    opts = Keyword.validate!(opts, ignore_claims: [])
+
     discovery_document_uri = config.discovery_document_uri
 
     with {:ok, protected} <- peek_protected(jwt),
@@ -531,7 +556,7 @@ defmodule OpenIDConnect do
          {:ok, document} <- Document.fetch_document(discovery_document_uri),
          {true, claims, _jwk} <- verify_signature(document.jwks, token_alg, jwt),
          {:ok, unverified_claims} <- Jason.decode(claims),
-         {:ok, verified_claims} <- verify_claims(unverified_claims, config) do
+         {:ok, verified_claims} <- verify_claims(unverified_claims, config, opts) do
       {:ok, verified_claims}
     else
       {:error, %Jason.DecodeError{}} ->
@@ -578,15 +603,25 @@ defmodule OpenIDConnect do
   defp verify_signature(%JOSE.JWK{} = jwk, token_alg, jwt),
     do: JOSE.JWS.verify_strict(jwk, [token_alg], jwt)
 
-  defp verify_claims(claims, config) do
+  defp verify_claims(claims, config, opts) do
     leeway = Map.get(config, :leeway, 30)
     client_id = Map.fetch!(config, :client_id)
 
-    with :ok <- verify_exp_claim(claims, leeway),
-         :ok <- verify_aud_claim(claims, client_id) do
+    with :ok <- maybe_verify_exp_claim(claims, leeway, opts),
+         :ok <- maybe_verify_aud_claim(claims, client_id, opts) do
       {:ok, claims}
     end
   end
+
+  defp maybe_verify_exp_claim(claims, leeway, opts) do
+    if ignore_claim?(opts, "exp") do
+      :ok
+    else
+      verify_exp_claim(claims, leeway)
+    end
+  end
+
+  defp ignore_claim?(opts, claim), do: claim in List.wrap(opts[:ignore_claims])
 
   defp verify_exp_claim(claims, leeway) do
     case Map.fetch(claims, "exp") do
@@ -602,6 +637,14 @@ defmodule OpenIDConnect do
 
       :error ->
         {:error, "exp", "missing"}
+    end
+  end
+
+  defp maybe_verify_aud_claim(claims, expected_aud, opts) do
+    if ignore_claim?(opts, "aud") do
+      :ok
+    else
+      verify_aud_claim(claims, expected_aud)
     end
   end
 

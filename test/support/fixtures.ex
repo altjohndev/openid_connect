@@ -4,18 +4,26 @@ defmodule OpenIDConnect.Fixtures do
     endpoint = "http://localhost:#{bypass.port}/"
     {jwks, overrides} = Map.pop(overrides, "jwks")
 
-    Bypass.expect_once(bypass, "GET", "/.well-known/jwks.json", fn conn ->
-      {status_code, body, headers} = load_fixture(provider, "jwks")
-      body = if jwks, do: jwks, else: body
-      send_response(conn, status_code, body, headers)
-    end)
+    {status_code, body, headers} = load_fixture(provider, "jwks")
+    body = if jwks, do: jwks, else: body
 
-    Bypass.expect_once(bypass, "GET", "/.well-known/discovery-document.json", fn conn ->
-      {status_code, body, headers} = load_fixture(provider, "discovery_document")
-      body = Map.merge(body, %{"jwks_uri" => "#{endpoint}.well-known/jwks.json"})
-      body = Map.merge(body, overrides)
-      send_response(conn, status_code, body, headers)
-    end)
+    Bypass.expect_once(
+      bypass,
+      "GET",
+      "/.well-known/jwks.json",
+      &send_response(&1, status_code, body, headers)
+    )
+
+    {status_code, body, headers} = load_fixture(provider, "discovery_document")
+    body = Map.merge(body, %{"jwks_uri" => "#{endpoint}.well-known/jwks.json"})
+    body = Map.merge(body, overrides)
+
+    Bypass.expect_once(
+      bypass,
+      "GET",
+      "/.well-known/discovery-document.json",
+      &send_response(&1, status_code, body, headers)
+    )
 
     {bypass, "#{endpoint}.well-known/discovery-document.json"}
   end

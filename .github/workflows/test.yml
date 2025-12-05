@@ -18,8 +18,8 @@ jobs:
         id: beam
         uses: erlef/setup-beam@v1
         with:
-          otp-version: "27" # Define the OTP version
-          elixir-version: "1.18" # Define the Elixir version
+          otp-version: "28" # Define the OTP version
+          elixir-version: "1.19" # Define the Elixir version
 
       - name: Install dependencies
         run: mix deps.get --only dev
@@ -79,6 +79,8 @@ jobs:
             otp-version: "26"
           - elixir-version: "1.18"
             otp-version: "27"
+          - elixir-version: "1.19"
+            otp-version: "28"
     steps:
       - uses: actions/checkout@v3
       - uses: erlef/setup-beam@v1
